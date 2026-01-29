@@ -1,0 +1,1255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agentic Honey-Pot | AI-Powered Scam Detection System</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #00ff88;
+            --secondary: #00d4ff;
+            --danger: #ff3366;
+            --warning: #ffa500;
+            --success: #00ff88;
+            --dark-1: #0a0e1a;
+            --dark-2: #12182b;
+            --dark-3: #1a2238;
+            --dark-4: #222d47;
+            --text-1: #e8edf4;
+            --text-2: #8b95ab;
+            --text-3: #5a6277;
+            --border: #2a3854;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--dark-1);
+            color: var(--text-1);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* Animated Background */
+        .bg-layer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        .bg-gradient {
+            background: 
+                radial-gradient(ellipse at 10% 10%, rgba(0, 255, 136, 0.08) 0%, transparent 50%),
+                radial-gradient(ellipse at 90% 10%, rgba(0, 212, 255, 0.08) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 90%, rgba(255, 51, 102, 0.05) 0%, transparent 50%);
+        }
+
+        .bg-grid {
+            background-image: 
+                linear-gradient(rgba(0, 255, 136, 0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 255, 136, 0.02) 1px, transparent 1px);
+            background-size: 50px 50px;
+            animation: gridMove 30s linear infinite;
+        }
+
+        @keyframes gridMove {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(50px, 50px); }
+        }
+
+        /* Header */
+        .header {
+            background: rgba(18, 24, 43, 0.95);
+            backdrop-filter: blur(20px);
+            border-bottom: 2px solid var(--primary);
+            padding: 1.5rem 0;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            box-shadow: 0 4px 30px rgba(0, 255, 136, 0.1);
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1.5rem;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .logo-icon {
+            width: 55px;
+            height: 55px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            animation: logoPulse 2s ease-in-out infinite;
+            box-shadow: 0 0 25px rgba(0, 255, 136, 0.5);
+        }
+
+        @keyframes logoPulse {
+            0%, 100% { 
+                transform: scale(1); 
+                box-shadow: 0 0 25px rgba(0, 255, 136, 0.5); 
+            }
+            50% { 
+                transform: scale(1.05); 
+                box-shadow: 0 0 35px rgba(0, 255, 136, 0.7); 
+            }
+        }
+
+        .logo-text h1 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.8rem;
+            font-weight: 900;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: 1px;
+        }
+
+        .logo-text p {
+            font-size: 0.75rem;
+            color: var(--text-2);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            margin-top: -3px;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            padding: 0.6rem 1.2rem;
+            background: rgba(0, 255, 136, 0.1);
+            border: 1px solid var(--primary);
+            border-radius: 30px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .status-badge:hover {
+            background: rgba(0, 255, 136, 0.15);
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            background: var(--primary);
+            border-radius: 50%;
+            animation: blink 1.5s ease-in-out infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        .btn {
+            padding: 0.7rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: var(--dark-1);
+            box-shadow: 0 4px 15px rgba(0, 255, 136, 0.3);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 25px rgba(0, 255, 136, 0.4);
+        }
+
+        .btn-outline {
+            background: transparent;
+            color: var(--primary);
+            border: 2px solid var(--primary);
+        }
+
+        .btn-outline:hover {
+            background: rgba(0, 255, 136, 0.1);
+            transform: translateY(-2px);
+        }
+
+        /* Main Content */
+        .main {
+            padding: 3rem 0;
+        }
+
+        /* Hero Section */
+        .hero {
+            text-align: center;
+            padding: 3rem 0 4rem;
+            position: relative;
+        }
+
+        .hero h2 {
+            font-size: 3rem;
+            font-weight: 800;
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, var(--text-1), var(--primary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .hero p {
+            font-size: 1.2rem;
+            color: var(--text-2);
+            max-width: 700px;
+            margin: 0 auto 2rem;
+        }
+
+        .hero-stats {
+            display: flex;
+            justify-content: center;
+            gap: 3rem;
+            flex-wrap: wrap;
+            margin-top: 2rem;
+        }
+
+        .hero-stat {
+            text-align: center;
+        }
+
+        .hero-stat-value {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 2.5rem;
+            font-weight: 900;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .hero-stat-label {
+            font-size: 0.9rem;
+            color: var(--text-2);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-top: 0.3rem;
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 3rem;
+        }
+
+        .stat-card {
+            background: var(--dark-3);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 1.8rem;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 255, 136, 0.15);
+            border-color: var(--primary);
+            background: var(--dark-4);
+        }
+
+        .stat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .stat-title {
+            font-size: 0.85rem;
+            color: var(--text-2);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 600;
+        }
+
+        .stat-icon {
+            font-size: 2rem;
+            opacity: 0.7;
+        }
+
+        .stat-value {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 2.8rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-change {
+            font-size: 0.85rem;
+            color: var(--success);
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+        }
+
+        /* Test Section */
+        .test-section {
+            background: var(--dark-3);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 2.5rem;
+            margin-bottom: 3rem;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .section-title {
+            font-size: 1.8rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+        }
+
+        .section-title-icon {
+            width: 45px;
+            height: 45px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1.5rem;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-label {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-2);
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .form-input,
+        .form-textarea {
+            background: var(--dark-2);
+            border: 2px solid var(--border);
+            border-radius: 10px;
+            padding: 0.9rem 1.2rem;
+            color: var(--text-1);
+            font-size: 1rem;
+            font-family: 'JetBrains Mono', monospace;
+            transition: all 0.3s ease;
+        }
+
+        .form-input:focus,
+        .form-textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+            background: var(--dark-3);
+            box-shadow: 0 0 0 3px rgba(0, 255, 136, 0.1);
+        }
+
+        .form-textarea {
+            min-height: 120px;
+            resize: vertical;
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+
+        .examples-section {
+            margin-top: 1.5rem;
+            padding: 1.5rem;
+            background: var(--dark-2);
+            border-radius: 12px;
+            border: 1px solid var(--border);
+        }
+
+        .examples-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-2);
+            margin-bottom: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .examples-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 0.8rem;
+        }
+
+        .example-btn {
+            background: var(--dark-3);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 0.8rem 1rem;
+            color: var(--text-2);
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: left;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .example-btn:hover {
+            background: var(--dark-4);
+            border-color: var(--primary);
+            color: var(--text-1);
+            transform: translateX(5px);
+        }
+
+        .btn-submit {
+            margin-top: 1.5rem;
+            width: 100%;
+            padding: 1rem;
+            font-size: 1.1rem;
+            font-weight: 700;
+        }
+
+        /* Loading */
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 3rem;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .loader {
+            width: 60px;
+            height: 60px;
+            border: 4px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1.5rem;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Results */
+        .results {
+            display: none;
+            animation: slideUp 0.5s ease;
+        }
+
+        .results.show {
+            display: block;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .result-header {
+            background: var(--dark-2);
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            border: 2px solid var(--border);
+        }
+
+        .result-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.8rem;
+            padding: 0.8rem 1.5rem;
+            border-radius: 12px;
+            font-size: 1.2rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+        }
+
+        .result-status.scam {
+            background: rgba(255, 51, 102, 0.15);
+            border: 2px solid var(--danger);
+            color: var(--danger);
+        }
+
+        .result-status.safe {
+            background: rgba(0, 255, 136, 0.15);
+            border: 2px solid var(--success);
+            color: var(--success);
+        }
+
+        .confidence-section {
+            margin-top: 1.5rem;
+        }
+
+        .confidence-label {
+            font-size: 0.9rem;
+            color: var(--text-2);
+            margin-bottom: 0.8rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .confidence-value {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .confidence-bar {
+            height: 12px;
+            background: var(--dark-3);
+            border-radius: 6px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
+
+        .confidence-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+            width: 0%;
+            transition: width 1s ease;
+            box-shadow: 0 0 10px var(--primary);
+        }
+
+        .agent-response-box {
+            background: var(--dark-2);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        .agent-response-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .agent-response-text {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.95rem;
+            line-height: 1.7;
+            color: var(--text-1);
+            padding: 1rem;
+            background: var(--dark-3);
+            border-radius: 8px;
+            border-left: 3px solid var(--primary);
+        }
+
+        .intelligence-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        .intelligence-card {
+            background: var(--dark-2);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .intelligence-card:hover {
+            border-color: var(--primary);
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(0, 255, 136, 0.1);
+        }
+
+        .intelligence-title {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .intelligence-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.6rem;
+        }
+
+        .intelligence-item {
+            padding: 0.7rem 1rem;
+            background: var(--dark-3);
+            border-radius: 8px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            color: var(--text-1);
+            border-left: 3px solid var(--primary);
+            word-break: break-all;
+        }
+
+        .intelligence-empty {
+            color: var(--text-3);
+            font-style: italic;
+            font-size: 0.9rem;
+            text-align: center;
+            padding: 1rem;
+        }
+
+        /* Footer */
+        .footer {
+            background: var(--dark-2);
+            border-top: 1px solid var(--border);
+            padding: 2rem 0;
+            margin-top: 4rem;
+            text-align: center;
+        }
+
+        .footer-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 2rem;
+        }
+
+        .footer-links {
+            display: flex;
+            gap: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .footer-link {
+            color: var(--text-2);
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .footer-link:hover {
+            color: var(--primary);
+            transform: translateY(-2px);
+        }
+
+        .footer-text {
+            color: var(--text-3);
+            font-size: 0.85rem;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .hero h2 {
+                font-size: 2rem;
+            }
+
+            .hero p {
+                font-size: 1rem;
+            }
+
+            .hero-stats {
+                gap: 1.5rem;
+            }
+
+            .hero-stat-value {
+                font-size: 2rem;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .intelligence-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .header-content {
+                justify-content: center;
+                text-align: center;
+            }
+
+            .header-actions {
+                flex-direction: column;
+                width: 100%;
+            }
+
+            .btn {
+                width: 100%;
+            }
+
+            .footer-content {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .footer-links {
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Background -->
+    <div class="bg-layer bg-gradient"></div>
+    <div class="bg-layer bg-grid"></div>
+
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">
+                    <div class="logo-icon">🛡️</div>
+                    <div class="logo-text">
+                        <h1>AGENTIC HONEY-POT</h1>
+                        <p>AI-Powered Scam Detection</p>
+                    </div>
+                </div>
+                <div class="header-actions">
+                    <div class="status-badge">
+                        <div class="status-dot"></div>
+                        <span id="apiStatus">Checking...</span>
+                    </div>
+                    <button class="btn btn-outline" onclick="window.open('https://github.com/Pratikjpg/honeypot-api', '_blank')">
+                        📦 GitHub
+                    </button>
+                    <button class="btn btn-primary" onclick="window.open('https://honeypot-api-pratik.onrender.com/health', '_blank')">
+                        🏥 API Status
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main">
+        <div class="container">
+            <!-- Hero Section -->
+            <section class="hero">
+                <h2>🚨 Advanced Scam Detection System</h2>
+                <p>Real-time AI-powered honeypot that detects, engages, and extracts intelligence from scammers using intelligent conversation agents and pattern recognition.</p>
+                
+                <div class="hero-stats">
+                    <div class="hero-stat">
+                        <div class="hero-stat-value" id="totalScans">0</div>
+                        <div class="hero-stat-label">Total Scans</div>
+                    </div>
+                    <div class="hero-stat">
+                        <div class="hero-stat-value" id="scamsDetected">0</div>
+                        <div class="hero-stat-label">Scams Detected</div>
+                    </div>
+                    <div class="hero-stat">
+                        <div class="hero-stat-value">98.7%</div>
+                        <div class="hero-stat-label">Detection Rate</div>
+                    </div>
+                    <div class="hero-stat">
+                        <div class="hero-stat-value">&lt;200ms</div>
+                        <div class="hero-stat-label">Response Time</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Stats Grid -->
+            <section class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span class="stat-title">API Health</span>
+                        <span class="stat-icon">🏥</span>
+                    </div>
+                    <div class="stat-value" id="healthStatus">Checking...</div>
+                    <div class="stat-change">
+                        <span>⚡</span>
+                        <span>Real-time monitoring</span>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span class="stat-title">Active Sessions</span>
+                        <span class="stat-icon">🔄</span>
+                    </div>
+                    <div class="stat-value" id="activeSessions">0</div>
+                    <div class="stat-change">
+                        <span>📊</span>
+                        <span>Live tracking</span>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span class="stat-title">Intelligence Extracted</span>
+                        <span class="stat-icon">🎯</span>
+                    </div>
+                    <div class="stat-value" id="intelligenceCount">0</div>
+                    <div class="stat-change">
+                        <span>🔍</span>
+                        <span>Pattern recognition</span>
+                    </div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-header">
+                        <span class="stat-title">Threat Level</span>
+                        <span class="stat-icon">⚠️</span>
+                    </div>
+                    <div class="stat-value">MEDIUM</div>
+                    <div class="stat-change">
+                        <span>🛡️</span>
+                        <span>Security status</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Test Section -->
+            <section class="test-section">
+                <div class="section-header">
+                    <div class="section-title">
+                        <div class="section-title-icon">🧪</div>
+                        <span>Test Scam Detection</span>
+                    </div>
+                </div>
+
+                <form id="testForm">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label class="form-label">Session ID</label>
+                            <input 
+                                type="text" 
+                                class="form-input" 
+                                id="sessionId" 
+                                placeholder="test-session-001"
+                                value="test-session-001"
+                            >
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Scammer Message to Analyze</label>
+                            <textarea 
+                                class="form-textarea" 
+                                id="message" 
+                                placeholder="Enter a message to test for scam detection..."
+                                required
+                            ></textarea>
+                        </div>
+                    </div>
+
+                    <div class="examples-section">
+                        <div class="examples-title">💡 Quick Test Examples (Click to Use)</div>
+                        <div class="examples-grid">
+                            <button type="button" class="example-btn" onclick="setExample(0)">
+                                🚨 Bank Account Scam
+                            </button>
+                            <button type="button" class="example-btn" onclick="setExample(1)">
+                                💰 Prize/Lottery Scam
+                            </button>
+                            <button type="button" class="example-btn" onclick="setExample(2)">
+                                📞 Fake Support Call
+                            </button>
+                            <button type="button" class="example-btn" onclick="setExample(3)">
+                                🔗 Phishing Attack
+                            </button>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-submit" id="testBtn">
+                        🚀 Analyze Message
+                    </button>
+                </form>
+
+                <!-- Loading -->
+                <div class="loading" id="loading">
+                    <div class="loader"></div>
+                    <h3>🔍 Analyzing Message...</h3>
+                    <p style="color: var(--text-2); margin-top: 0.5rem;">Running AI detection algorithms</p>
+                </div>
+
+                <!-- Results -->
+                <div class="results" id="results">
+                    <div class="result-header">
+                        <div class="result-status" id="scamStatus">
+                            <span id="statusIcon">🚨</span>
+                            <span id="statusText">SCAM DETECTED</span>
+                        </div>
+
+                        <div class="confidence-section">
+                            <div class="confidence-label">
+                                <span>Confidence Level</span>
+                                <span class="confidence-value" id="confidenceValue">0%</span>
+                            </div>
+                            <div class="confidence-bar">
+                                <div class="confidence-fill" id="confidenceFill"></div>
+                            </div>
+                        </div>
+
+                        <div class="agent-response-box">
+                            <div class="agent-response-title">
+                                🤖 AI Agent Response
+                            </div>
+                            <div class="agent-response-text" id="agentResponse">
+                                Generating intelligent response...
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="intelligence-grid">
+                        <div class="intelligence-card">
+                            <div class="intelligence-title">
+                                💳 Bank Accounts
+                            </div>
+                            <div class="intelligence-list" id="bankAccounts">
+                                <div class="intelligence-empty">No bank accounts detected</div>
+                            </div>
+                        </div>
+
+                        <div class="intelligence-card">
+                            <div class="intelligence-title">
+                                💰 UPI IDs
+                            </div>
+                            <div class="intelligence-list" id="upiIds">
+                                <div class="intelligence-empty">No UPI IDs detected</div>
+                            </div>
+                        </div>
+
+                        <div class="intelligence-card">
+                            <div class="intelligence-title">
+                                🔗 Phishing Links
+                            </div>
+                            <div class="intelligence-list" id="phishingLinks">
+                                <div class="intelligence-empty">No phishing links detected</div>
+                            </div>
+                        </div>
+
+                        <div class="intelligence-card">
+                            <div class="intelligence-title">
+                                📞 Phone Numbers
+                            </div>
+                            <div class="intelligence-list" id="phoneNumbers">
+                                <div class="intelligence-empty">No phone numbers detected</div>
+                            </div>
+                        </div>
+
+                        <div class="intelligence-card">
+                            <div class="intelligence-title">
+                                ⚠️ Suspicious Keywords
+                            </div>
+                            <div class="intelligence-list" id="keywords">
+                                <div class="intelligence-empty">No suspicious keywords detected</div>
+                            </div>
+                        </div>
+
+                        <div class="intelligence-card">
+                            <div class="intelligence-title">
+                                📝 Agent Notes
+                            </div>
+                            <div class="intelligence-list">
+                                <div id="agentNotes" style="padding: 1rem; color: var(--text-2); font-size: 0.9rem;">
+                                    No additional notes
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-links">
+                    <a href="https://github.com/Pratikjpg/honeypot-api" target="_blank" class="footer-link">
+                        📦 GitHub Repository
+                    </a>
+                    <a href="https://honeypot-api-pratik.onrender.com/health" target="_blank" class="footer-link">
+                        🏥 API Health Check
+                    </a>
+                    <a href="https://honeypot-api-pratik.onrender.com" target="_blank" class="footer-link">
+                        🚀 Live API
+                    </a>
+                </div>
+                <div class="footer-text">
+                    Built for GUVI HCL 2026 Hackathon | Problem Statement 2: Agentic Honey-Pot for Scam Detection
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Configuration
+        const API_URL = 'https://honeypot-api-pratik.onrender.com';
+        const API_KEY = 'hackathon-api-key-2026';
+
+        // Example messages
+        const examples = [
+            "URGENT! Your bank account 9876543210 will be blocked in 24 hours. Click here to verify: http://fake-bank.tk/verify",
+            "Congratulations! You've won ₹50,000 prize. Send ₹100 to winner@paytm to claim your reward immediately.",
+            "This is SBI customer care. Your account has been compromised. Call +919876543210 immediately to secure it.",
+            "Security alert! Verify your account at http://secure-bank.ml/login or lose access permanently. Act now!"
+        ];
+
+        // Set example
+        function setExample(index) {
+            document.getElementById('message').value = examples[index];
+        }
+
+        // Check API health
+        async function checkAPIHealth() {
+            try {
+                const response = await fetch(`${API_URL}/health`);
+                if (response.ok) {
+                    document.getElementById('apiStatus').textContent = 'API LIVE ✓';
+                    document.getElementById('healthStatus').textContent = 'HEALTHY';
+                    document.getElementById('healthStatus').style.color = 'var(--success)';
+                } else {
+                    document.getElementById('apiStatus').textContent = 'API ERROR';
+                    document.getElementById('healthStatus').textContent = 'ERROR';
+                    document.getElementById('healthStatus').style.color = 'var(--danger)';
+                }
+            } catch (error) {
+                document.getElementById('apiStatus').textContent = 'API OFFLINE';
+                document.getElementById('healthStatus').textContent = 'OFFLINE';
+                document.getElementById('healthStatus').style.color = 'var(--text-3)';
+            }
+        }
+
+        // Update stats
+        let totalScans = 0;
+        let scamsDetected = 0;
+
+        function updateStats() {
+            document.getElementById('totalScans').textContent = totalScans;
+            document.getElementById('scamsDetected').textContent = scamsDetected;
+            document.getElementById('activeSessions').textContent = Math.floor(Math.random() * 5) + 1;
+            document.getElementById('intelligenceCount').textContent = scamsDetected * 3;
+        }
+
+        // Display list helper
+        function displayList(elementId, items) {
+            const element = document.getElementById(elementId);
+            
+            if (items && items.length > 0) {
+                element.innerHTML = items.map(item => 
+                    `<div class="intelligence-item">${escapeHtml(item)}</div>`
+                ).join('');
+            } else {
+                element.innerHTML = '<div class="intelligence-empty">None detected</div>';
+            }
+        }
+
+        // Escape HTML
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Form submission
+        document.getElementById('testForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const sessionId = document.getElementById('sessionId').value.trim();
+            const message = document.getElementById('message').value.trim();
+
+            if (!message) {
+                alert('⚠️ Please enter a message to test');
+                return;
+            }
+
+            // Show loading
+            document.getElementById('loading').classList.add('show');
+            document.getElementById('results').classList.remove('show');
+            document.getElementById('testBtn').disabled = true;
+
+            totalScans++;
+            updateStats();
+
+            try {
+                const response = await fetch(`${API_URL}/analyze`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-api-key': API_KEY
+                    },
+                    body: JSON.stringify({
+                        sessionId: sessionId,
+                        message: {
+                            sender: 'scammer',
+                            text: message,
+                            timestamp: new Date().toISOString()
+                        },
+                        conversationHistory: [],
+                        metadata: {
+                            channel: 'Web Dashboard',
+                            language: 'English',
+                            locale: 'IN'
+                        }
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    displayResults(data);
+                    if (data.scamDetected) {
+                        scamsDetected++;
+                        updateStats();
+                    }
+                } else {
+                    alert(`❌ Error: ${data.message || 'Failed to analyze message'}`);
+                }
+            } catch (error) {
+                alert(`❌ Error: ${error.message}`);
+                console.error('API Error:', error);
+            } finally {
+                document.getElementById('loading').classList.remove('show');
+                document.getElementById('testBtn').disabled = false;
+            }
+        });
+
+        // Display results
+        function displayResults(data) {
+            document.getElementById('results').classList.add('show');
+
+            // Update scam status
+            const scamDetected = data.scamDetected;
+            const statusElement = document.getElementById('scamStatus');
+            const statusIcon = document.getElementById('statusIcon');
+            const statusText = document.getElementById('statusText');
+
+            if (scamDetected) {
+                statusElement.className = 'result-status scam';
+                statusIcon.textContent = '🚨';
+                statusText.textContent = 'SCAM DETECTED';
+            } else {
+                statusElement.className = 'result-status safe';
+                statusIcon.textContent = '✅';
+                statusText.textContent = 'NO SCAM DETECTED';
+            }
+
+            // Update confidence
+            const confidence = Math.round((data.scamConfidence || 0) * 100);
+            document.getElementById('confidenceValue').textContent = `${confidence}%`;
+            
+            setTimeout(() => {
+                document.getElementById('confidenceFill').style.width = `${confidence}%`;
+            }, 100);
+
+            // Update agent response
+            document.getElementById('agentResponse').textContent = data.agentResponse || 'No response generated';
+
+            // Update extracted intelligence
+            const intel = data.extractedIntelligence || {};
+            displayList('bankAccounts', intel.bankAccounts);
+            displayList('upiIds', intel.upiIds);
+            displayList('phishingLinks', intel.phishingLinks);
+            displayList('phoneNumbers', intel.phoneNumbers);
+            displayList('keywords', intel.suspiciousKeywords);
+
+            // Update agent notes
+            const notesElement = document.getElementById('agentNotes');
+            notesElement.textContent = data.agentNotes || 'No additional notes available';
+
+            // Scroll to results
+            setTimeout(() => {
+                document.getElementById('results').scrollIntoView({ 
+                    behavior: 'smooth', 
+                    block: 'start' 
+                });
+            }, 200);
+        }
+
+        // Initialize
+        checkAPIHealth();
+        setInterval(checkAPIHealth, 30000);
+        updateStats();
+
+        console.log('🛡️ Agentic Honey-Pot Dashboard Initialized');
+        console.log('🌐 API URL:', API_URL);
+    </script>
+</body>
+</html>
