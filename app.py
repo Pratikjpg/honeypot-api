@@ -3,7 +3,7 @@ Agentic Honey-Pot for Scam Detection & Intelligence Extraction
 GUVI HCL 2026 Hackathon - Problem Statement 2
 """
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import os
 from datetime import datetime
@@ -22,7 +22,7 @@ from Session_manager import SessionManager
 # CONFIGURATION
 # ============================================================================
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='.')
 CORS(app)
 
 # Configure logging
@@ -138,9 +138,27 @@ def send_final_result_to_guvi(session_id, session_data):
 # ROUTES
 # ============================================================================
 
-@app.route('/', methods=['GET'])
-def root():
-    """Root endpoint - service info"""
+@app.route('/')
+def serve_dashboard():
+    """Serve the main dashboard HTML"""
+    try:
+        return send_from_directory('.', 'index.html')
+    except:
+        return jsonify({
+            'status': 'running',
+            'service': 'Agentic Honey-Pot API',
+            'version': '1.0.0',
+            'message': 'Dashboard not found. Please ensure index.html is in the project root.',
+            'endpoints': {
+                'health': '/health',
+                'analyze': '/analyze',
+                'sessions': '/sessions'
+            }
+        }), 200
+
+@app.route('/api')
+def api_info():
+    """API information endpoint"""
     return jsonify({
         'status': 'running',
         'service': 'Agentic Honey-Pot API',
@@ -275,7 +293,7 @@ def analyze_message():
                 )
                 session_data['agent_notes'] = agent_notes or ''
         except Exception as e:
-            logger.warning(f"⚠️  Agent notes error: {e}")
+            logger.warning(f"⚠️ Agent notes error: {e}")
 
         # Calculate engagement metrics
         try:
@@ -351,7 +369,7 @@ def not_found(error):
     return jsonify({
         'status': 'error',
         'message': 'Endpoint not found',
-        'available_endpoints': ['/', '/health', '/analyze', '/sessions']
+        'available_endpoints': ['/', '/api', '/health', '/analyze', '/sessions']
     }), 404
 
 @app.errorhandler(405)
@@ -374,6 +392,7 @@ if __name__ == '__main__':
     logger.info(f"API Key: {API_KEY[:20]}...")
     logger.info(f"GUVI Callback: {GUVI_CALLBACK_URL}")
     logger.info(f"Port: {PORT}")
+    logger.info(f"Dashboard: http://localhost:{PORT}/")
     logger.info("=" * 80)
 
     try:
