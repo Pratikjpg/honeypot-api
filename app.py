@@ -1,404 +1,376 @@
 """
-Agentic Honey-Pot for Scam Detection & Intelligence Extraction
-GUVI HCL 2026 Hackathon - Problem Statement 2
+Agentic Honey-Pot API - GUVI HCL 2026 Hackathon
+CORRECTED VERSION - Matches all professor requirements
 """
 
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify
 from flask_cors import CORS
-import os
 from datetime import datetime
-import logging
-import sys
-from functools import wraps
+import os
 import requests
+from typing import Dict, Optional
 
-# Import custom modules
+# Import your modules
 from Scam_detector import ScamDetector
-from Conversation_agent import ConversationAgent
 from Intelligence_extractor import IntelligenceExtractor
+from Conversation_agent import ConversationAgent
 from Session_manager import SessionManager
 
-# ============================================================================
-# CONFIGURATION
-# ============================================================================
-
-app = Flask(__name__, static_folder='.')
+# Initialize Flask app
+app = Flask(__name__)
 CORS(app)
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
-
-# API Configuration
-API_KEY = os.getenv('API_KEY', 'hackathon-api-key-2026')
-GUVI_CALLBACK_URL = os.getenv('GUVI_CALLBACK_URL', 'https://hackathon.guvi.in/api/updateHoneyPotFinalResult')
-PORT = int(os.getenv('PORT', 5000))
-
 # Initialize components
-try:
-    scam_detector = ScamDetector()
-    conversation_agent = ConversationAgent()
-    intelligence_extractor = IntelligenceExtractor()
-    session_manager = SessionManager()
-    logger.info("✅ All components initialized")
-except Exception as e:
-    logger.error(f"❌ Initialization error: {e}", exc_info=True)
-    raise
+scam_detector = ScamDetector()
+intelligence_extractor = IntelligenceExtractor()
+conversation_agent = ConversationAgent()
+session_manager = SessionManager()
 
-# ============================================================================
-# UTILITY FUNCTIONS
-# ============================================================================
+# Configuration
+API_KEY = os.environ.get('API_KEY', 'hackathon-api-key-2026')
+GUVI_CALLBACK_URL = "https://hackathon.guvi.in/api/updateHoneyPotFinalResult"
 
-def verify_api_key():
-    """Verify API key from request headers"""
-    provided_key = request.headers.get('x-api-key', '').strip()
-    if not provided_key or provided_key != API_KEY:
-        logger.warning("❌ Invalid API key attempted")
+# Conversation finalization thresholds
+MAX_MESSAGES = 15  # Finalize after 15 messages
+MIN_MESSAGES_FOR_FINALIZATION = 5  # Minimum messages before finalizing
+CONFIDENCE_THRESHOLD_FOR_FINALIZATION = 0.8  # High confidence to finalize
+
+
+def check_api_key():
+    """Validate API key from request headers"""
+    api_key = request.headers.get('x-api-key')
+    if not api_key or api_key != API_KEY:
         return False
     return True
 
-def validate_request(f):
-    """Decorator to validate incoming requests"""
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        try:
-            # Check Content-Type
-            if request.content_type != 'application/json':
-                return jsonify({'status': 'error', 'message': 'Content-Type must be application/json'}), 400
 
-            # Check API key
-            if not verify_api_key():
-                return jsonify({'status': 'error', 'message': 'Invalid or missing API key'}), 401
-
-            # Parse JSON
-            try:
-                data = request.get_json(force=True)
-            except:
-                return jsonify({'status': 'error', 'message': 'Invalid JSON format'}), 400
-
-            if not data:
-                return jsonify({'status': 'error', 'message': 'No data provided'}), 400
-
-            # Validate required fields
-            if 'sessionId' not in data or 'message' not in data:
-                return jsonify({'status': 'error', 'message': 'Missing required fields: sessionId, message'}), 400
-
-            message = data.get('message', {})
-            message_text = str(message.get('text', '')).strip()
-            
-            if not message_text:
-                return jsonify({'status': 'error', 'message': 'message.text cannot be empty'}), 400
-
-            if len(message_text) > 5000:
-                return jsonify({'status': 'error', 'message': 'message.text exceeds 5000 characters'}), 400
-
-            return f(*args, **kwargs)
-
-        except Exception as e:
-            logger.error(f"❌ Validation error: {e}", exc_info=True)
-            return jsonify({'status': 'error', 'message': 'Request validation failed'}), 500
-
-    return decorated_function
-
-def send_final_result_to_guvi(session_id, session_data):
-    """Send final results to GUVI evaluation endpoint"""
-    if not session_data.get('scam_detected'):
+def should_finalize_conversation(session: Dict) -> bool:
+    """
+    Determine if conversation should be finalized
+    Based on message count and intelligence gathered
+    """
+    message_count = session['message_count']
+    scam_detected = session['scam_detected']
+    intelligence = session['intelligence']
+    
+    # Don't finalize if scam not detected
+    if not scam_detected:
+        return False
+    
+    # Don't finalize too early
+    if message_count < MIN_MESSAGES_FOR_FINALIZATION:
+        return False
+    
+    # Finalize if we've gathered substantial intelligence
+    has_substantial_intel = (
+        len(intelligence.get('bankAccounts', [])) > 0 or
+        len(intelligence.get('upiIds', [])) > 0 or
+        len(intelligence.get('phishingLinks', [])) > 0 or
+        len(intelligence.get('phoneNumbers', [])) > 0
+    )
+    
+    # Finalize if:
+    # 1. Reached max messages OR
+    # 2. Have substantial intelligence and enough messages
+    if message_count >= MAX_MESSAGES:
         return True
+    
+    if has_substantial_intel and message_count >= MIN_MESSAGES_FOR_FINALIZATION + 3:
+        return True
+    
+    # High confidence scam with good intel
+    if session['scam_confidence'] >= CONFIDENCE_THRESHOLD_FOR_FINALIZATION and has_substantial_intel:
+        return True
+    
+    return False
 
+
+def send_final_result_to_guvi(session_id: str, session: Dict) -> bool:
+    """
+    Send final extracted intelligence to GUVI evaluation endpoint
+    This is MANDATORY per Section 12 of requirements
+    """
     try:
         payload = {
             "sessionId": session_id,
-            "scamDetected": session_data.get('scam_detected', False),
-            "totalMessagesExchanged": session_data.get('message_count', 0),
-            "extractedIntelligence": session_data.get('intelligence', {}),
-            "agentNotes": session_data.get('agent_notes', '')
+            "scamDetected": session['scam_detected'],
+            "totalMessagesExchanged": session['message_count'],
+            "extractedIntelligence": session['intelligence'],
+            "agentNotes": session['agent_notes']
         }
-
-        logger.info(f"📤 Sending GUVI callback for session {session_id}")
-        response = requests.post(GUVI_CALLBACK_URL, json=payload, timeout=10, headers={'Content-Type': 'application/json'})
-
-        if response.status_code in [200, 201, 202]:
-            logger.info(f"✅ GUVI callback SUCCESS for {session_id}")
+        
+        print(f"\n📤 Sending final result to GUVI for session: {session_id}")
+        print(f"Payload: {payload}")
+        
+        response = requests.post(
+            GUVI_CALLBACK_URL,
+            json=payload,
+            timeout=10,
+            headers={'Content-Type': 'application/json'}
+        )
+        
+        print(f"✅ GUVI callback response: {response.status_code}")
+        
+        if response.status_code == 200:
             return True
         else:
-            logger.error(f"❌ GUVI callback FAILED (Status: {response.status_code})")
+            print(f"⚠️ GUVI callback failed with status: {response.status_code}")
+            print(f"Response: {response.text}")
             return False
-
-    except requests.exceptions.Timeout:
-        logger.error(f"❌ GUVI callback TIMEOUT")
-        return False
+            
     except Exception as e:
-        logger.error(f"❌ GUVI callback ERROR: {e}", exc_info=True)
+        print(f"❌ Error sending to GUVI: {e}")
         return False
 
-# ============================================================================
-# ROUTES
-# ============================================================================
-
-@app.route('/')
-def serve_dashboard():
-    """Serve the main dashboard HTML"""
-    try:
-        return send_from_directory('.', 'index.html')
-    except:
-        return jsonify({
-            'status': 'running',
-            'service': 'Agentic Honey-Pot API',
-            'version': '1.0.0',
-            'message': 'Dashboard not found. Please ensure index.html is in the project root.',
-            'endpoints': {
-                'health': '/health',
-                'analyze': '/analyze',
-                'sessions': '/sessions'
-            }
-        }), 200
-
-@app.route('/api')
-def api_info():
-    """API information endpoint"""
-    return jsonify({
-        'status': 'running',
-        'service': 'Agentic Honey-Pot API',
-        'version': '1.0.0',
-        'endpoints': {
-            'health': '/health',
-            'analyze': '/analyze',
-            'sessions': '/sessions'
-        }
-    }), 200
 
 @app.route('/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""
-    try:
-        return jsonify({
-            'status': 'healthy',
-            'service': 'Agentic Honey-Pot API',
-            'timestamp': datetime.utcnow().isoformat(),
-            'components': {
-                'scam_detector': 'ready',
-                'conversation_agent': 'ready',
-                'intelligence_extractor': 'ready',
-                'session_manager': 'ready'
-            }
-        }), 200
-    except Exception as e:
-        logger.error(f"❌ Health check failed: {e}")
-        return jsonify({'status': 'unhealthy', 'error': str(e)}), 500
+    return jsonify({
+        'status': 'healthy',
+        'service': 'Agentic Honey-Pot API',
+        'timestamp': datetime.utcnow().isoformat() + 'Z',
+        'version': '2.0-corrected'
+    }), 200
+
 
 @app.route('/analyze', methods=['POST'])
-@validate_request
 def analyze_message():
-    """Main API endpoint for scam detection and engagement"""
-    start_time = datetime.utcnow()
-
+    """
+    Main endpoint to analyze incoming messages
+    CORRECTED VERSION - Matches professor's requirements exactly
+    """
+    # Check API authentication
+    if not check_api_key():
+        return jsonify({
+            'status': 'error',
+            'message': 'Unauthorized - Invalid or missing API key'
+        }), 401
+    
     try:
-        data = request.get_json(force=True)
-        session_id = str(data.get('sessionId')).strip()
+        # Parse request
+        data = request.get_json()
+        
+        # Extract required fields
+        session_id = data.get('sessionId')
         message = data.get('message', {})
         conversation_history = data.get('conversationHistory', [])
         metadata = data.get('metadata', {})
-
-        message_text = str(message.get('text', '')).strip()
-        sender = str(message.get('sender', 'scammer')).strip()
-        message_timestamp = message.get('timestamp', datetime.utcnow().isoformat())
-
-        logger.info(f"📨 [Session: {session_id}] Processing message from {sender}")
-
+        
+        # Validate required fields
+        if not session_id or not message:
+            return jsonify({
+                'status': 'error',
+                'message': 'Missing required fields: sessionId and message'
+            }), 400
+        
         # Get or create session
-        session_data = session_manager.get_or_create_session(session_id)
-        session_data['message_count'] += 1
-        session_data['last_activity'] = datetime.utcnow().isoformat()
-
-        # Build conversation history
-        full_conversation = [
-            {'sender': str(m.get('sender', '')), 'text': str(m.get('text', '')), 'timestamp': m.get('timestamp', '')}
-            for m in (conversation_history or [])
-        ]
-
-        full_conversation.append({
+        session = session_manager.get_or_create_session(session_id)
+        
+        # Extract message details
+        sender = message.get('sender', 'unknown')
+        text = message.get('text', '')
+        timestamp = message.get('timestamp', datetime.utcnow().isoformat() + 'Z')
+        
+        # Only process scammer messages
+        if sender != 'scammer':
+            return jsonify({
+                'status': 'success',
+                'reply': 'Message acknowledged'
+            }), 200
+        
+        # Increment message count
+        session['message_count'] += 1
+        session['last_activity'] = datetime.utcnow().isoformat()
+        
+        # Detect scam intent
+        is_scam, confidence, indicators = scam_detector.detect_scam(
+            message=text,
+            conversation_history=conversation_history
+        )
+        
+        # Update session with scam detection results
+        if is_scam and not session['scam_detected']:
+            session['scam_detected'] = True
+            session['scam_confidence'] = confidence
+            session['scam_indicators'] = indicators
+        elif is_scam:
+            # Update confidence if higher
+            if confidence > session['scam_confidence']:
+                session['scam_confidence'] = confidence
+            # Add new indicators
+            session['scam_indicators'].extend(indicators)
+            session['scam_indicators'] = list(set(session['scam_indicators']))
+        
+        # Extract intelligence from this message
+        message_intelligence = intelligence_extractor.extract_from_text(text)
+        
+        # Merge with session intelligence
+        for key in session['intelligence']:
+            session['intelligence'][key].extend(message_intelligence[key])
+            # Deduplicate
+            session['intelligence'][key] = list(dict.fromkeys(session['intelligence'][key]))
+        
+        # Generate agent response
+        agent_response = conversation_agent.generate_response(
+            scammer_message=text,
+            conversation_history=conversation_history,
+            scam_detected=session['scam_detected'],
+            message_count=session['message_count']
+        )
+        
+        # Generate agent notes
+        agent_notes = conversation_agent.generate_agent_notes(
+            scam_indicators=session['scam_indicators'],
+            intelligence=session['intelligence']
+        )
+        session['agent_notes'] = agent_notes
+        
+        # Add to conversation history
+        session['conversation'].append({
             'sender': sender,
-            'text': message_text,
-            'timestamp': message_timestamp
+            'text': text,
+            'timestamp': timestamp
         })
-
-        session_data['conversation'].append({
-            'sender': sender,
-            'text': message_text,
-            'timestamp': message_timestamp
-        })
-
-        # SCAM DETECTION (first 5 messages only)
-        if session_data['message_count'] <= 5 and not session_data['scam_detected']:
-            try:
-                is_scam, confidence, indicators = scam_detector.detect_scam(message_text, full_conversation)
-                
-                if is_scam and confidence > 0.5:
-                    session_data['scam_detected'] = True
-                    session_data['scam_confidence'] = float(confidence)
-                    session_data['scam_indicators'] = indicators or []
-                    logger.info(f"🚨 [Session: {session_id}] SCAM DETECTED (Confidence: {confidence:.2%})")
-
-            except Exception as e:
-                logger.error(f"❌ Scam detection error: {e}", exc_info=True)
-
-        # INTELLIGENCE EXTRACTION
-        try:
-            intelligence = intelligence_extractor.extract_from_text(message_text)
-            for key in ['bankAccounts', 'upiIds', 'phishingLinks', 'phoneNumbers', 'suspiciousKeywords']:
-                if key in intelligence:
-                    session_data['intelligence'][key].extend(intelligence[key])
-            
-            for key in session_data['intelligence']:
-                session_data['intelligence'][key] = list(dict.fromkeys(session_data['intelligence'][key]))
-
-            logger.info(f"✅ [Session: {session_id}] Intelligence extracted")
-
-        except Exception as e:
-            logger.error(f"❌ Intelligence extraction error: {e}", exc_info=True)
-
-        # AGENT RESPONSE GENERATION
-        try:
-            agent_response = conversation_agent.generate_response(
-                message_text,
-                full_conversation,
-                session_data['scam_detected'],
-                session_data['message_count']
-            )
-            
-            if not agent_response or len(agent_response) > 500:
-                agent_response = "I'm sorry, I didn't understand that. Could you please explain more?"
-            
-            logger.info(f"💬 [Session: {session_id}] Agent response generated")
-
-        except Exception as e:
-            logger.error(f"❌ Agent response error: {e}", exc_info=True)
-            agent_response = "I'm having trouble understanding. Can you repeat that?"
-
-        session_data['conversation'].append({
+        session['conversation'].append({
             'sender': 'user',
             'text': agent_response,
-            'timestamp': datetime.utcnow().isoformat()
+            'timestamp': datetime.utcnow().isoformat() + 'Z'
         })
-
-        # AGENT NOTES
-        try:
-            if session_data['scam_detected']:
-                agent_notes = conversation_agent.generate_agent_notes(
-                    session_data.get('scam_indicators', []),
-                    session_data['intelligence']
-                )
-                session_data['agent_notes'] = agent_notes or ''
-        except Exception as e:
-            logger.warning(f"⚠️ Agent notes error: {e}")
-
-        # Calculate engagement metrics
-        try:
-            start_dt = datetime.fromisoformat(session_data['start_time'].replace('Z', '+00:00'))
-            current_dt = datetime.utcnow()
-            engagement_seconds = int((current_dt - start_dt).total_seconds())
-        except:
-            engagement_seconds = 0
-
-        # Update session
-        session_manager.update_session(session_id, session_data)
-
-        # Prepare response
-        response_data = {
+        
+        # Save updated session
+        session_manager.update_session(session_id, session)
+        
+        # Check if conversation should be finalized
+        should_finalize = should_finalize_conversation(session)
+        
+        if should_finalize and not session.get('finalized', False):
+            print(f"\n🎯 Finalizing conversation for session: {session_id}")
+            
+            # Mark as finalized
+            session['finalized'] = True
+            session_manager.update_session(session_id, session)
+            
+            # Send final result to GUVI (MANDATORY)
+            send_final_result_to_guvi(session_id, session)
+        
+        # Return response in CORRECT FORMAT (Section 8)
+        return jsonify({
             'status': 'success',
-            'sessionId': session_id,
-            'scamDetected': session_data['scam_detected'],
-            'scamConfidence': session_data.get('scam_confidence', 0.0),
-            'agentResponse': agent_response,
-            'engagementMetrics': {
-                'engagementDurationSeconds': engagement_seconds,
-                'totalMessagesExchanged': session_data['message_count']
-            },
-            'extractedIntelligence': session_data['intelligence'],
-            'agentNotes': session_data.get('agent_notes', ''),
-            'timestamp': datetime.utcnow().isoformat()
-        }
-
-        # Send GUVI callback
-        if session_data['scam_detected'] and session_data['message_count'] >= 3:
-            send_final_result_to_guvi(session_id, session_data)
-
-        response_time = (datetime.utcnow() - start_time).total_seconds()
-        logger.info(f"✅ [Session: {session_id}] Response in {response_time:.2f}s")
-
-        return jsonify(response_data), 200
-
+            'reply': agent_response
+        }), 200
+        
     except Exception as e:
-        logger.error(f"❌ /analyze error: {e}", exc_info=True)
+        print(f"❌ Error processing message: {e}")
         return jsonify({
             'status': 'error',
-            'message': 'Internal server error',
-            'timestamp': datetime.utcnow().isoformat()
+            'message': f'Internal server error: {str(e)}'
         }), 500
 
-@app.route('/sessions', methods=['GET'])
-def get_sessions():
-    """Get all active sessions and statistics"""
-    try:
-        if not verify_api_key():
-            return jsonify({'status': 'error', 'message': 'Invalid API key'}), 401
 
+@app.route('/sessions', methods=['GET'])
+def list_sessions():
+    """Get all active sessions (for monitoring)"""
+    if not check_api_key():
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    try:
         sessions = session_manager.list_sessions()
         stats = session_manager.get_statistics()
-
+        
         return jsonify({
-            'status': 'success',
+            'total_sessions': len(sessions),
             'sessions': sessions,
-            'statistics': stats,
-            'timestamp': datetime.utcnow().isoformat()
+            'statistics': stats
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/session/<session_id>', methods=['GET'])
+def get_session(session_id):
+    """Get detailed session information"""
+    if not check_api_key():
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    try:
+        session = session_manager.get_session(session_id)
+        if session:
+            return jsonify(session), 200
+        else:
+            return jsonify({'error': 'Session not found'}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/session/<session_id>/finalize', methods=['POST'])
+def finalize_session_manually(session_id):
+    """Manually finalize a session and send to GUVI"""
+    if not check_api_key():
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    try:
+        session = session_manager.get_session(session_id)
+        if not session:
+            return jsonify({'error': 'Session not found'}), 404
+        
+        if session.get('finalized', False):
+            return jsonify({'message': 'Session already finalized'}), 200
+        
+        # Mark as finalized
+        session['finalized'] = True
+        session_manager.update_session(session_id, session)
+        
+        # Send to GUVI
+        success = send_final_result_to_guvi(session_id, session)
+        
+        return jsonify({
+            'message': 'Session finalized',
+            'guvi_callback_success': success
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/', methods=['GET'])
+def index():
+    """Serve dashboard"""
+    try:
+        with open('index.html', 'r') as f:
+            return f.read()
+    except FileNotFoundError:
+        return jsonify({
+            'service': 'Agentic Honey-Pot API',
+            'status': 'running',
+            'endpoints': {
+                'health': '/health',
+                'analyze': '/analyze',
+                'sessions': '/sessions',
+                'session_detail': '/session/<id>',
+                'finalize': '/session/<id>/finalize'
+            }
         }), 200
 
-    except Exception as e:
-        logger.error(f"❌ /sessions error: {e}", exc_info=True)
-        return jsonify({'status': 'error', 'message': 'Failed to retrieve sessions'}), 500
-
-# ============================================================================
-# ERROR HANDLERS
-# ============================================================================
-
-@app.errorhandler(404)
-def not_found(error):
-    return jsonify({
-        'status': 'error',
-        'message': 'Endpoint not found',
-        'available_endpoints': ['/', '/api', '/health', '/analyze', '/sessions']
-    }), 404
-
-@app.errorhandler(405)
-def method_not_allowed(error):
-    return jsonify({'status': 'error', 'message': 'Method not allowed'}), 405
-
-@app.errorhandler(500)
-def internal_error(error):
-    logger.error(f"❌ Internal error: {error}", exc_info=True)
-    return jsonify({'status': 'error', 'message': 'Internal server error'}), 500
-
-# ============================================================================
-# STARTUP
-# ============================================================================
 
 if __name__ == '__main__':
-    logger.info("=" * 80)
-    logger.info("🚀 AGENTIC HONEY-POT API - PRODUCTION START")
-    logger.info("=" * 80)
-    logger.info(f"API Key: {API_KEY[:20]}...")
-    logger.info(f"GUVI Callback: {GUVI_CALLBACK_URL}")
-    logger.info(f"Port: {PORT}")
-    logger.info(f"Dashboard: http://localhost:{PORT}/")
-    logger.info("=" * 80)
-
-    try:
-        app.run(host='0.0.0.0', port=PORT, debug=False, use_reloader=False)
-    except KeyboardInterrupt:
-        logger.info("👋 Shutdown complete")
-    except Exception as e:
-        logger.error(f"❌ Startup failed: {e}", exc_info=True)
-        raise
+    port = int(os.environ.get('PORT', 5000))
+    print(f"""
+    ╔═══════════════════════════════════════════════════════════╗
+    ║                                                           ║
+    ║   🍯 AGENTIC HONEY-POT API - CORRECTED VERSION           ║
+    ║                                                           ║
+    ║   ✅ Scam Detection Engine                               ║
+    ║   ✅ Multi-turn AI Agent                                 ║
+    ║   ✅ Intelligence Extraction                             ║
+    ║   ✅ GUVI Callback (Section 12) - IMPLEMENTED            ║
+    ║   ✅ Correct Response Format (Section 8)                 ║
+    ║   ✅ Auto Conversation Finalization                      ║
+    ║                                                           ║
+    ║   Port: {port}                                              ║
+    ║   API Key Required: Yes                                  ║
+    ║                                                           ║
+    ╚═══════════════════════════════════════════════════════════╝
+    """)
+    
+    app.run(host='0.0.0.0', port=port, debug=False)
